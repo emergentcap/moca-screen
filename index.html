@@ -1512,10 +1512,6 @@ function MocaApp({ vizStyle, accent, accentDim, displayFont }) {
           onRetakeSame={() => restart(false)} onNextTest={() => restart(true)} />
       )}
 
-      <div style={mocaStyles.footer}>
-        <span>Moca-Screen · v1.0</span>
-        <span>Not a diagnosis</span>
-      </div>
     </div>
   );
 }
@@ -1584,15 +1580,7 @@ function Boot() {
   }, [hue, vizStyle, displayFont]);
 
   return (
-    <div className="frame-col" data-screen-label="01 App">
-      <div className="frame-label">Moca-Screen · Mobile</div>
-      <IOSDevice width={390} height={844} dark={true}>
-        <MocaApp vizStyle={vizStyle} accent={acc.accent} accentDim={acc.dim} displayFont={displayFont} />
-      </IOSDevice>
-      <div className="frame-label" style={{ opacity: 0.6 }}>
-        Intro → Register → Test (4 sections) → Results
-      </div>
-    </div>
+    <MocaApp vizStyle={vizStyle} accent={acc.accent} accentDim={acc.dim} displayFont={displayFont} />
   );
 }
 
