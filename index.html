@@ -1,0 +1,1604 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Moca-Screen — Mobile Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-0: #07090B;
+    --bg-1: #0E1216;
+    --bg-2: #141A20;
+    --line: rgba(255,255,255,0.08);
+    --line-strong: rgba(255,255,255,0.14);
+    --fg: #ECEFF2;
+    --fg-2: #AEB6BD;
+    --fg-3: #6B757E;
+    --accent: oklch(0.78 0.09 200);
+    --accent-dim: oklch(0.45 0.07 210);
+    --font-display: 'Instrument Serif', 'Times New Roman', serif;
+    --font-ui: 'Geist', -apple-system, system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  }
+  html, body {
+    margin: 0; padding: 0;
+    background: #050607;
+    color: var(--fg);
+    font-family: var(--font-ui);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+  * { box-sizing: border-box; }
+
+  .stage {
+    min-height: 100vh;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 48px 24px 80px;
+    background:
+      radial-gradient(ellipse 80% 60% at 20% 0%, rgba(30, 70, 90, 0.25), transparent 60%),
+      radial-gradient(ellipse 60% 50% at 90% 30%, rgba(20, 50, 70, 0.18), transparent 60%),
+      #050607;
+  }
+  .stage-inner {
+    display: flex; gap: 40px; align-items: flex-start;
+    flex-wrap: wrap; justify-content: center;
+  }
+  .frame-col {
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+  }
+  .frame-label {
+    font-family: var(--font-mono);
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--fg-3);
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  input:focus {
+    border-color: rgba(120, 200, 220, 0.55) !important;
+    box-shadow: 0 0 0 2px rgba(120, 200, 220, 0.15);
+  }
+  input::placeholder { color: #4A535C; }
+
+  .tweaks {
+    position: fixed; right: 20px; bottom: 20px;
+    width: 280px;
+    background: rgba(14, 18, 22, 0.92);
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    border: 1px solid var(--line-strong);
+    border-radius: 14px;
+    padding: 14px;
+    z-index: 200;
+    font-family: var(--font-ui);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    display: none;
+  }
+  .tweaks.open { display: block; }
+  .tweaks h4 {
+    margin: 0 0 12px;
+    font-family: var(--font-mono);
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--fg-3); font-weight: 500;
+  }
+  .tweaks label {
+    display: block; font-size: 12px; color: var(--fg-2);
+    margin: 10px 0 6px;
+  }
+  .tweaks select {
+    width: 100%;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    color: var(--fg);
+    padding: 6px 8px; border-radius: 6px;
+    font-family: inherit; font-size: 13px;
+  }
+  .tweak-swatches { display: flex; gap: 6px; margin-top: 4px; }
+  .tweak-swatches button {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 1px solid var(--line-strong);
+    cursor: pointer; padding: 0;
+  }
+  .tweak-swatches button.active {
+    outline: 2px solid var(--fg); outline-offset: 2px;
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="stage-inner" id="root"></div>
+</div>
+
+<div class="tweaks" id="tweaks">
+  <h4>Tweaks</h4>
+  <label>Accent hue</label>
+  <div class="tweak-swatches" id="swatches">
+    <button data-hue="200" style="background: oklch(0.78 0.09 200)"></button>
+    <button data-hue="160" style="background: oklch(0.78 0.09 160)"></button>
+    <button data-hue="280" style="background: oklch(0.78 0.09 280)"></button>
+    <button data-hue="50" style="background: oklch(0.82 0.09 70)"></button>
+    <button data-hue="20" style="background: oklch(0.75 0.09 20)"></button>
+  </div>
+  <label>Brain viz style</label>
+  <select id="vizStyle">
+    <option value="neural">Neural network</option>
+    <option value="contours">Contour mesh</option>
+    <option value="orbit">Orbital rings</option>
+  </select>
+  <label>Display font</label>
+  <select id="fontSel">
+    <option value="Instrument Serif">Instrument Serif</option>
+    <option value="Geist">Geist (sans)</option>
+    <option value="JetBrains Mono">JetBrains Mono</option>
+  </select>
+</div>
+
+<script>
+  window.TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "accentHue": 200,
+    "vizStyle": "neural",
+    "displayFont": "Instrument Serif"
+  }/*EDITMODE-END*/;
+</script>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<!-- inlined at build -->
+<script type="text/babel" data-presets="react">
+
+// iOS.jsx — Simplified iOS 26 (Liquid Glass) device frame
+// Based on the iOS 26 UI Kit + Figma status bar spec. No assets, no deps.
+// Exports: IOSDevice, IOSStatusBar, IOSNavBar, IOSGlassPill, IOSList, IOSListRow, IOSKeyboard
+
+// ─────────────────────────────────────────────────────────────
+// Status bar
+// ─────────────────────────────────────────────────────────────
+function IOSStatusBar({ dark = false, time = '9:41' }) {
+  const c = dark ? '#fff' : '#000';
+  return (
+    <div style={{
+      display: 'flex', gap: 154, alignItems: 'center', justifyContent: 'center',
+      padding: '21px 24px 19px', boxSizing: 'border-box',
+      position: 'relative', zIndex: 20, width: '100%',
+    }}>
+      <div style={{ flex: 1, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: 1.5 }}>
+        <span style={{
+          fontFamily: '-apple-system, "SF Pro", system-ui', fontWeight: 590,
+          fontSize: 17, lineHeight: '22px', color: c,
+        }}>{time}</span>
+      </div>
+      <div style={{ flex: 1, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, paddingTop: 1, paddingRight: 1 }}>
+        <svg width="19" height="12" viewBox="0 0 19 12">
+          <rect x="0" y="7.5" width="3.2" height="4.5" rx="0.7" fill={c}/>
+          <rect x="4.8" y="5" width="3.2" height="7" rx="0.7" fill={c}/>
+          <rect x="9.6" y="2.5" width="3.2" height="9.5" rx="0.7" fill={c}/>
+          <rect x="14.4" y="0" width="3.2" height="12" rx="0.7" fill={c}/>
+        </svg>
+        <svg width="17" height="12" viewBox="0 0 17 12">
+          <path d="M8.5 3.2C10.8 3.2 12.9 4.1 14.4 5.6L15.5 4.5C13.7 2.7 11.2 1.5 8.5 1.5C5.8 1.5 3.3 2.7 1.5 4.5L2.6 5.6C4.1 4.1 6.2 3.2 8.5 3.2Z" fill={c}/>
+          <path d="M8.5 6.8C9.9 6.8 11.1 7.3 12 8.2L13.1 7.1C11.8 5.9 10.2 5.1 8.5 5.1C6.8 5.1 5.2 5.9 3.9 7.1L5 8.2C5.9 7.3 7.1 6.8 8.5 6.8Z" fill={c}/>
+          <circle cx="8.5" cy="10.5" r="1.5" fill={c}/>
+        </svg>
+        <svg width="27" height="13" viewBox="0 0 27 13">
+          <rect x="0.5" y="0.5" width="23" height="12" rx="3.5" stroke={c} strokeOpacity="0.35" fill="none"/>
+          <rect x="2" y="2" width="20" height="9" rx="2" fill={c}/>
+          <path d="M25 4.5V8.5C25.8 8.2 26.5 7.2 26.5 6.5C26.5 5.8 25.8 4.8 25 4.5Z" fill={c} fillOpacity="0.4"/>
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Liquid glass pill — blur + tint + shine
+// ─────────────────────────────────────────────────────────────
+function IOSGlassPill({ children, dark = false, style = {} }) {
+  return (
+    <div style={{
+      height: 44, minWidth: 44, borderRadius: 9999,
+      position: 'relative', overflow: 'hidden',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      boxShadow: dark
+        ? '0 2px 6px rgba(0,0,0,0.35), 0 6px 16px rgba(0,0,0,0.2)'
+        : '0 1px 3px rgba(0,0,0,0.07), 0 3px 10px rgba(0,0,0,0.06)',
+      ...style,
+    }}>
+      {/* blur + tint */}
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: 9999,
+        backdropFilter: 'blur(12px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(12px) saturate(180%)',
+        background: dark ? 'rgba(120,120,128,0.28)' : 'rgba(255,255,255,0.5)',
+      }} />
+      {/* shine */}
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: 9999,
+        boxShadow: dark
+          ? 'inset 1.5px 1.5px 1px rgba(255,255,255,0.15), inset -1px -1px 1px rgba(255,255,255,0.08)'
+          : 'inset 1.5px 1.5px 1px rgba(255,255,255,0.7), inset -1px -1px 1px rgba(255,255,255,0.4)',
+        border: dark ? '0.5px solid rgba(255,255,255,0.15)' : '0.5px solid rgba(0,0,0,0.06)',
+      }} />
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', padding: '0 4px' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Navigation bar — glass pills + large title
+// ─────────────────────────────────────────────────────────────
+function IOSNavBar({ title = 'Title', dark = false, trailingIcon = true }) {
+  const muted = dark ? 'rgba(255,255,255,0.6)' : '#404040';
+  const text = dark ? '#fff' : '#000';
+  const pillIcon = (content) => (
+    <IOSGlassPill dark={dark}>
+      <div style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {content}
+      </div>
+    </IOSGlassPill>
+  );
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 10,
+      paddingTop: 62, paddingBottom: 10, position: 'relative', zIndex: 5,
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 16px',
+      }}>
+        {/* back chevron */}
+        {pillIcon(
+          <svg width="12" height="20" viewBox="0 0 12 20" fill="none" style={{ marginLeft: -1 }}>
+            <path d="M10 2L2 10l8 8" stroke={muted} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        )}
+        {/* trailing ellipsis */}
+        {trailingIcon && pillIcon(
+          <svg width="22" height="6" viewBox="0 0 22 6">
+            <circle cx="3" cy="3" r="2.5" fill={muted}/>
+            <circle cx="11" cy="3" r="2.5" fill={muted}/>
+            <circle cx="19" cy="3" r="2.5" fill={muted}/>
+          </svg>
+        )}
+      </div>
+      {/* large title */}
+      <div style={{
+        padding: '0 16px',
+        fontFamily: '-apple-system, system-ui',
+        fontSize: 34, fontWeight: 700, lineHeight: '41px',
+        color: text, letterSpacing: 0.4,
+      }}>{title}</div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Grouped list (inset card, r:26) + row (52px)
+// ─────────────────────────────────────────────────────────────
+function IOSListRow({ title, detail, icon, chevron = true, isLast = false, dark = false }) {
+  const text = dark ? '#fff' : '#000';
+  const sec = dark ? 'rgba(235,235,245,0.6)' : 'rgba(60,60,67,0.6)';
+  const ter = dark ? 'rgba(235,235,245,0.3)' : 'rgba(60,60,67,0.3)';
+  const sep = dark ? 'rgba(84,84,88,0.65)' : 'rgba(60,60,67,0.12)';
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', minHeight: 52,
+      padding: '0 16px', position: 'relative',
+      fontFamily: '-apple-system, system-ui', fontSize: 17,
+      letterSpacing: -0.43,
+    }}>
+      {icon && (
+        <div style={{
+          width: 30, height: 30, borderRadius: 7, background: icon,
+          marginRight: 12, flexShrink: 0,
+        }} />
+      )}
+      <div style={{ flex: 1, color: text }}>{title}</div>
+      {detail && <span style={{ color: sec, marginRight: 6 }}>{detail}</span>}
+      {chevron && (
+        <svg width="8" height="14" viewBox="0 0 8 14" style={{ flexShrink: 0 }}>
+          <path d="M1 1l6 6-6 6" stroke={ter} strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      )}
+      {!isLast && (
+        <div style={{
+          position: 'absolute', bottom: 0, right: 0,
+          left: icon ? 58 : 16, height: 0.5, background: sep,
+        }} />
+      )}
+    </div>
+  );
+}
+
+function IOSList({ header, children, dark = false }) {
+  const hc = dark ? 'rgba(235,235,245,0.6)' : 'rgba(60,60,67,0.6)';
+  const bg = dark ? '#1C1C1E' : '#fff';
+  return (
+    <div>
+      {header && (
+        <div style={{
+          fontFamily: '-apple-system, system-ui', fontSize: 13,
+          color: hc, textTransform: 'uppercase',
+          padding: '8px 36px 6px', letterSpacing: -0.08,
+        }}>{header}</div>
+      )}
+      <div style={{
+        background: bg, borderRadius: 26,
+        margin: '0 16px', overflow: 'hidden',
+      }}>{children}</div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Device frame
+// ─────────────────────────────────────────────────────────────
+function IOSDevice({
+  children, width = 402, height = 874, dark = false,
+  title, keyboard = false,
+}) {
+  return (
+    <div style={{
+      width, height, borderRadius: 48, overflow: 'hidden',
+      position: 'relative', background: dark ? '#000' : '#F2F2F7',
+      boxShadow: '0 40px 80px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.12)',
+      fontFamily: '-apple-system, system-ui, sans-serif',
+      WebkitFontSmoothing: 'antialiased',
+    }}>
+      {/* dynamic island */}
+      <div style={{
+        position: 'absolute', top: 11, left: '50%', transform: 'translateX(-50%)',
+        width: 126, height: 37, borderRadius: 24, background: '#000', zIndex: 50,
+      }} />
+      {/* status bar (absolute) */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
+        <IOSStatusBar dark={dark} />
+      </div>
+      {/* nav + content */}
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+        {title !== undefined && <IOSNavBar title={title} dark={dark} />}
+        <div style={{ flex: 1, overflow: 'auto' }}>{children}</div>
+        {keyboard && <IOSKeyboard dark={dark} />}
+      </div>
+      {/* home indicator — always on top */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 60,
+        height: 34, display: 'flex', justifyContent: 'center', alignItems: 'flex-end',
+        paddingBottom: 8, pointerEvents: 'none',
+      }}>
+        <div style={{
+          width: 139, height: 5, borderRadius: 100,
+          background: dark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.25)',
+        }} />
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Keyboard — iOS 26 liquid glass
+// ─────────────────────────────────────────────────────────────
+function IOSKeyboard({ dark = false }) {
+  const glyph = dark ? 'rgba(255,255,255,0.7)' : '#595959';
+  const sugg = dark ? 'rgba(255,255,255,0.6)' : '#333';
+  const keyBg = dark ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.85)';
+
+  // special-key icons
+  const icons = {
+    shift: <svg width="19" height="17" viewBox="0 0 19 17"><path d="M9.5 1L1 9.5h4.5V16h8V9.5H18L9.5 1z" fill={glyph}/></svg>,
+    del: <svg width="23" height="17" viewBox="0 0 23 17"><path d="M7 1h13a2 2 0 012 2v11a2 2 0 01-2 2H7l-6-7.5L7 1z" fill="none" stroke={glyph} strokeWidth="1.6" strokeLinejoin="round"/><path d="M10 5l7 7M17 5l-7 7" stroke={glyph} strokeWidth="1.6" strokeLinecap="round"/></svg>,
+    ret: <svg width="20" height="14" viewBox="0 0 20 14"><path d="M18 1v6H4m0 0l4-4M4 7l4 4" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  };
+
+  const key = (content, { w, flex, ret, fs = 25, k } = {}) => (
+    <div key={k} style={{
+      height: 42, borderRadius: 8.5,
+      flex: flex ? 1 : undefined, width: w, minWidth: 0,
+      background: ret ? '#08f' : keyBg,
+      boxShadow: '0 1px 0 rgba(0,0,0,0.075)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: '-apple-system, "SF Compact", system-ui',
+      fontSize: fs, fontWeight: 458, color: ret ? '#fff' : glyph,
+    }}>{content}</div>
+  );
+
+  const row = (keys, pad = 0) => (
+    <div style={{ display: 'flex', gap: 6.5, justifyContent: 'center', padding: `0 ${pad}px` }}>
+      {keys.map(l => key(l, { flex: true, k: l }))}
+    </div>
+  );
+
+  return (
+    <div style={{
+      position: 'relative', zIndex: 15, borderRadius: 27, overflow: 'hidden',
+      padding: '11px 0 2px',
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      boxShadow: dark
+        ? '0 -2px 20px rgba(0,0,0,0.09)'
+        : '0 -1px 6px rgba(0,0,0,0.018), 0 -3px 20px rgba(0,0,0,0.012)',
+    }}>
+      {/* liquid glass bg — same recipe as nav pills */}
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: 27,
+        backdropFilter: 'blur(12px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(12px) saturate(180%)',
+        background: dark ? 'rgba(120,120,128,0.14)' : 'rgba(255,255,255,0.25)',
+      }} />
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: 27,
+        boxShadow: dark
+          ? 'inset 1.5px 1.5px 1px rgba(255,255,255,0.15)'
+          : 'inset 1.5px 1.5px 1px rgba(255,255,255,0.7), inset -1px -1px 1px rgba(255,255,255,0.4)',
+        border: dark ? '0.5px solid rgba(255,255,255,0.15)' : '0.5px solid rgba(0,0,0,0.06)',
+        pointerEvents: 'none',
+      }} />
+
+      {/* autocorrect bar */}
+      <div style={{
+        display: 'flex', gap: 20, alignItems: 'center',
+        padding: '8px 22px 13px', width: '100%', boxSizing: 'border-box',
+        position: 'relative',
+      }}>
+        {['"The"', 'the', 'to'].map((w, i) => (
+          <React.Fragment key={i}>
+            {i > 0 && <div style={{ width: 1, height: 25, background: '#ccc', opacity: 0.3 }} />}
+            <div style={{
+              flex: 1, textAlign: 'center',
+              fontFamily: '-apple-system, system-ui', fontSize: 17,
+              color: sugg, letterSpacing: -0.43, lineHeight: '22px',
+            }}>{w}</div>
+          </React.Fragment>
+        ))}
+      </div>
+
+      {/* key layout */}
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 13,
+        padding: '0 6.5px', width: '100%', boxSizing: 'border-box',
+        position: 'relative',
+      }}>
+        {row(['q','w','e','r','t','y','u','i','o','p'])}
+        {row(['a','s','d','f','g','h','j','k','l'], 20)}
+        <div style={{ display: 'flex', gap: 14.25, alignItems: 'center' }}>
+          {key(icons.shift, { w: 45, k: 'shift' })}
+          <div style={{ display: 'flex', gap: 6.5, flex: 1 }}>
+            {['z','x','c','v','b','n','m'].map(l => key(l, { flex: true, k: l }))}
+          </div>
+          {key(icons.del, { w: 45, k: 'del' })}
+        </div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {key('ABC', { w: 92.25, fs: 18, k: 'abc' })}
+          {key('', { flex: true, k: 'space' })}
+          {key(icons.ret, { w: 92.25, ret: true, k: 'ret' })}
+        </div>
+      </div>
+
+      {/* bottom spacer (emoji+mic area, icons omitted) */}
+      <div style={{ height: 56, width: '100%', position: 'relative' }} />
+    </div>
+  );
+}
+
+Object.assign(window, {
+  IOSDevice, IOSStatusBar, IOSNavBar, IOSGlassPill, IOSList, IOSListRow, IOSKeyboard,
+});
+
+</script>
+<script type="text/babel" data-presets="react">
+// brain-viz.jsx — abstract brain imaging hero visuals
+// Three original styles: neural network, contour mesh, orbital rings.
+// No copyrighted assets; all generated from deterministic seeded math.
+
+// --- tiny seeded RNG for stable layouts ---
+function mulberry32(seed) {
+  return function() {
+    let t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+// A soft brain-shaped silhouette (abstract blob, NOT anatomical) via bezier
+function BrainSilhouette({ stroke, fill = "none", opacity = 0.25, width = 2 }) {
+  return (
+    <path
+      d="M200,60
+         C140,60 95,95 95,150
+         C70,155 55,180 60,210
+         C45,225 50,260 80,270
+         C75,300 105,325 145,325
+         C160,345 195,350 215,335
+         C235,350 270,345 285,325
+         C325,325 355,300 350,270
+         C380,260 385,225 370,210
+         C375,180 360,155 335,150
+         C335,95 290,60 230,60
+         C220,55 210,55 200,60 Z"
+      fill={fill}
+      stroke={stroke}
+      strokeWidth={width}
+      strokeLinejoin="round"
+      opacity={opacity}
+    />
+  );
+}
+
+// Central vertical fissure hint
+function Fissure({ stroke, opacity = 0.2 }) {
+  return (
+    <path
+      d="M215,62 C210,120 220,180 212,240 C205,290 215,330 218,345"
+      stroke={stroke}
+      strokeWidth="1"
+      fill="none"
+      opacity={opacity}
+      strokeDasharray="2 3"
+    />
+  );
+}
+
+function NeuralViz({ accent, accentDim, size = 340, animated = true }) {
+  const rand = mulberry32(7);
+  // nodes inside the silhouette bounding area
+  const nodes = React.useMemo(() => {
+    const r = mulberry32(11);
+    const pts = [];
+    // seed ~40 nodes roughly inside an ellipse
+    let tries = 0;
+    while (pts.length < 42 && tries < 500) {
+      tries++;
+      const x = 60 + r() * 320;
+      const y = 60 + r() * 290;
+      // ellipse test
+      const dx = (x - 218) / 160;
+      const dy = (y - 205) / 150;
+      if (dx * dx + dy * dy > 1) continue;
+      // margin from others
+      if (pts.some(p => (p.x - x) ** 2 + (p.y - y) ** 2 < 800)) continue;
+      pts.push({ x, y, r: 1.2 + r() * 2.4, phase: r() * Math.PI * 2 });
+    }
+    return pts;
+  }, []);
+
+  const edges = React.useMemo(() => {
+    const r = mulberry32(19);
+    const out = [];
+    for (let i = 0; i < nodes.length; i++) {
+      // connect to nearest 2-3
+      const d = nodes.map((n, j) => ({ j, d: (n.x - nodes[i].x) ** 2 + (n.y - nodes[i].y) ** 2 }))
+        .filter(o => o.j !== i).sort((a,b) => a.d - b.d).slice(0, 2 + Math.floor(r() * 2));
+      d.forEach(o => { if (o.j > i) out.push([i, o.j, r()]); });
+    }
+    return out;
+  }, [nodes]);
+
+  return (
+    <svg viewBox="0 0 436 410" width={size} height={size * 410 / 436} style={{ display: 'block' }}>
+      <defs>
+        <radialGradient id="nv-glow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor={accent} stopOpacity="0.35" />
+          <stop offset="70%" stopColor={accent} stopOpacity="0.05" />
+          <stop offset="100%" stopColor={accent} stopOpacity="0" />
+        </radialGradient>
+        <filter id="nv-blur" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="1" />
+        </filter>
+      </defs>
+
+      {/* ambient glow */}
+      <ellipse cx="218" cy="205" rx="170" ry="155" fill="url(#nv-glow)" />
+
+      <BrainSilhouette stroke={accent} opacity={0.35} width={1.2} />
+      <BrainSilhouette stroke={accent} opacity={0.1} width={8} />
+      <Fissure stroke={accent} opacity={0.3} />
+
+      {/* edges */}
+      <g opacity="0.7">
+        {edges.map(([a, b, w], i) => (
+          <line
+            key={i}
+            x1={nodes[a].x} y1={nodes[a].y}
+            x2={nodes[b].x} y2={nodes[b].y}
+            stroke={accent}
+            strokeOpacity={0.12 + w * 0.25}
+            strokeWidth="0.6"
+          />
+        ))}
+      </g>
+
+      {/* nodes */}
+      <g>
+        {nodes.map((n, i) => (
+          <g key={i}>
+            <circle cx={n.x} cy={n.y} r={n.r + 2} fill={accent} opacity="0.08" filter="url(#nv-blur)" />
+            <circle cx={n.x} cy={n.y} r={n.r} fill={accent} opacity={0.55 + (i % 4) * 0.12}>
+              {animated && i % 3 === 0 && (
+                <animate attributeName="opacity"
+                  values="0.4;0.95;0.4"
+                  dur={`${3 + (i % 5)}s`}
+                  begin={`${n.phase.toFixed(2)}s`}
+                  repeatCount="indefinite" />
+              )}
+            </circle>
+          </g>
+        ))}
+      </g>
+
+      {/* a few pulsing data pulses traveling along edges */}
+      {animated && edges.slice(0, 5).map(([a, b], i) => {
+        const na = nodes[a], nb = nodes[b];
+        return (
+          <circle key={`p-${i}`} r="1.6" fill="#fff" opacity="0.9">
+            <animate attributeName="cx" values={`${na.x};${nb.x};${na.x}`} dur={`${4 + i}s`} repeatCount="indefinite" />
+            <animate attributeName="cy" values={`${na.y};${nb.y};${na.y}`} dur={`${4 + i}s`} repeatCount="indefinite" />
+            <animate attributeName="opacity" values="0;0.9;0" dur={`${4 + i}s`} repeatCount="indefinite" />
+          </circle>
+        );
+      })}
+    </svg>
+  );
+}
+
+function ContourViz({ accent, size = 340 }) {
+  // concentric contours inside brain silhouette shape via multiple scaled paths
+  const layers = [];
+  for (let i = 0; i < 8; i++) {
+    const t = i / 7;
+    const inset = 10 + i * 18;
+    layers.push(
+      <ellipse key={i}
+        cx="218" cy="205"
+        rx={160 - inset * 0.7}
+        ry={145 - inset * 0.65}
+        stroke={accent}
+        strokeOpacity={0.08 + t * 0.18}
+        fill="none"
+        strokeWidth="0.8"
+      />
+    );
+  }
+  // horizontal contour slices
+  const slices = [];
+  for (let i = 0; i < 12; i++) {
+    const y = 80 + i * 22;
+    const amp = 8 + (i % 3) * 6;
+    let d = `M 70 ${y}`;
+    for (let x = 70; x <= 370; x += 8) {
+      const yy = y + Math.sin((x + i * 20) * 0.05) * amp * 0.3;
+      d += ` L ${x} ${yy.toFixed(1)}`;
+    }
+    slices.push(
+      <path key={`s-${i}`} d={d} stroke={accent} strokeOpacity={0.18} fill="none" strokeWidth="0.6" />
+    );
+  }
+  return (
+    <svg viewBox="0 0 436 410" width={size} height={size * 410 / 436} style={{ display: 'block' }}>
+      <defs>
+        <clipPath id="brain-clip">
+          <path d="M200,60 C140,60 95,95 95,150 C70,155 55,180 60,210 C45,225 50,260 80,270 C75,300 105,325 145,325 C160,345 195,350 215,335 C235,350 270,345 285,325 C325,325 355,300 350,270 C380,260 385,225 370,210 C375,180 360,155 335,150 C335,95 290,60 230,60 C220,55 210,55 200,60 Z" />
+        </clipPath>
+        <radialGradient id="cv-glow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor={accent} stopOpacity="0.3" />
+          <stop offset="100%" stopColor={accent} stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <ellipse cx="218" cy="205" rx="170" ry="155" fill="url(#cv-glow)" />
+      <g clipPath="url(#brain-clip)">
+        {slices}
+      </g>
+      <BrainSilhouette stroke={accent} opacity={0.5} width={1} />
+      <Fissure stroke={accent} opacity={0.35} />
+      {layers}
+    </svg>
+  );
+}
+
+function OrbitViz({ accent, size = 340 }) {
+  return (
+    <svg viewBox="0 0 436 410" width={size} height={size * 410 / 436} style={{ display: 'block' }}>
+      <defs>
+        <radialGradient id="ov-glow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor={accent} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={accent} stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <ellipse cx="218" cy="205" rx="170" ry="155" fill="url(#ov-glow)" />
+      <BrainSilhouette stroke={accent} opacity={0.4} width={1.2} />
+      <Fissure stroke={accent} opacity={0.3} />
+      {/* orbital ellipses at varying tilts */}
+      {[0, 30, 60, 90, 120, 150].map((a, i) => (
+        <ellipse key={i}
+          cx="218" cy="205"
+          rx={160} ry={60}
+          stroke={accent}
+          strokeOpacity={0.18 + (i % 3) * 0.08}
+          fill="none"
+          strokeWidth="0.8"
+          transform={`rotate(${a} 218 205)`}
+        />
+      ))}
+      {/* data ticks along one ring */}
+      {Array.from({ length: 24 }).map((_, i) => {
+        const a = (i / 24) * Math.PI * 2;
+        const cx = 218 + Math.cos(a) * 160;
+        const cy = 205 + Math.sin(a) * 60;
+        return <circle key={i} cx={cx} cy={cy} r="1.3" fill={accent} opacity={0.5 + (i % 3) * 0.15} />;
+      })}
+      <circle cx="218" cy="205" r="3" fill={accent}>
+        <animate attributeName="opacity" values="0.6;1;0.6" dur="2.5s" repeatCount="indefinite" />
+      </circle>
+    </svg>
+  );
+}
+
+function BrainViz({ style = 'neural', accent, accentDim, size = 340 }) {
+  if (style === 'contours') return <ContourViz accent={accent} size={size} />;
+  if (style === 'orbit') return <OrbitViz accent={accent} size={size} />;
+  return <NeuralViz accent={accent} accentDim={accentDim} size={size} />;
+}
+
+Object.assign(window, { BrainViz, NeuralViz, ContourViz, OrbitViz, BrainSilhouette });
+
+</script>
+<script type="text/babel" data-presets="react">
+// moca-app.jsx — full 5-phase mobile MoCA-style assessment
+// Phases: intro → register (memorize 5 words) → test sections → results
+// Three rotating test sets (A/B/C). Dark high-tech brain-imaging aesthetic.
+
+const TEST_SETS = [
+  {
+    label: "Test A",
+    words: ["Face", "Velvet", "Church", "Daisy", "Red"],
+    animals: [
+      { q: "Name an animal that lives in the jungle and has a mane.", correct: "lion" },
+      { q: "Name an animal with a very long neck.", correct: "giraffe" },
+      { q: "Name the largest land animal on Earth.", correct: "elephant" },
+    ],
+    abstraction: "What do a train and a bicycle have in common?",
+  },
+  {
+    label: "Test B",
+    words: ["Silk", "Temple", "Harbor", "Candle", "Blue"],
+    animals: [
+      { q: "Name a large black and white bear from China.", correct: "panda" },
+      { q: "Name the fastest land animal on Earth.", correct: "cheetah" },
+      { q: "Name an animal with a very long trunk.", correct: "elephant" },
+    ],
+    abstraction: "What do a watch and a ruler have in common?",
+  },
+  {
+    label: "Test C",
+    words: ["Cabin", "River", "Falcon", "Blanket", "Green"],
+    animals: [
+      { q: "Name an animal known for its black and white stripes.", correct: "zebra" },
+      { q: "Name the largest big cat in the world.", correct: "tiger" },
+      { q: "Name an animal that uses echolocation to navigate at night.", correct: "bat" },
+    ],
+    abstraction: "What do an apple and a banana have in common?",
+  },
+];
+
+function buildQuestions(testSet) {
+  const now = new Date();
+  return [
+    {
+      id: "orientation", section: "ORIENTATION", icon: "cal",
+      items: [
+        { q: "What is today's date? (number)", key: "date", type: "number", correct: now.getDate().toString() },
+        { q: "What month is it? (number 1–12)", key: "month", type: "number", correct: (now.getMonth() + 1).toString() },
+        { q: "What year is it?", key: "year", type: "number", correct: now.getFullYear().toString() },
+        { q: "What day of the week is it?", key: "day", type: "text", correct: ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"][now.getDay()] },
+        { q: "What city are you in?", key: "city", type: "text", correct: null },
+      ],
+    },
+    {
+      id: "attention", section: "ATTENTION", icon: "focus",
+      items: [
+        { q: "Subtract 7 from 100. What do you get?", key: "a1", type: "number", correct: "93" },
+        { q: "Subtract 7 again.", key: "a2", type: "number", correct: "86" },
+        { q: "And again?", key: "a3", type: "number", correct: "79" },
+        { q: "And again?", key: "a4", type: "number", correct: "72" },
+        { q: "One more time?", key: "a5", type: "number", correct: "65" },
+      ],
+    },
+    {
+      id: "language", section: "LANGUAGE & ABSTRACTION", icon: "wave",
+      items: [
+        { q: testSet.animals[0].q, key: "l1", type: "text", correct: testSet.animals[0].correct },
+        { q: testSet.animals[1].q, key: "l2", type: "text", correct: testSet.animals[1].correct },
+        { q: testSet.animals[2].q, key: "l3", type: "text", correct: testSet.animals[2].correct },
+        { q: testSet.abstraction, key: "abs", type: "text", correct: null },
+      ],
+    },
+    {
+      id: "recall", section: "DELAYED RECALL", icon: "star", recall: true,
+      items: testSet.words.map((w, i) => ({
+        q: `Word ${i + 1} of 5:`, key: `r${i}`, type: "text", correct: w.toLowerCase(),
+      })),
+    },
+  ];
+}
+
+// --- Icons ---
+function MocaIcon({ kind, color = "currentColor", size = 20 }) {
+  const p = { stroke: color, strokeWidth: 1.3, fill: "none", strokeLinecap: "round", strokeLinejoin: "round" };
+  const s = { width: size, height: size };
+  switch (kind) {
+    case "cal": return <svg viewBox="0 0 20 20" {...s}><rect x="2.5" y="4" width="15" height="13.5" rx="2" {...p}/><path {...p} d="M2.5 8h15M6 2v3M14 2v3"/></svg>;
+    case "focus": return <svg viewBox="0 0 20 20" {...s}><circle cx="10" cy="10" r="3.5" {...p}/><circle cx="10" cy="10" r="8" {...p}/><path {...p} d="M10 1v2.5M10 16.5V19M1 10h2.5M16.5 10H19"/></svg>;
+    case "wave": return <svg viewBox="0 0 20 20" {...s}><path {...p} d="M2 10c1.5-4 2.5-4 4 0s2.5 4 4 0 2.5-4 4 0 2.5 4 4 0"/></svg>;
+    case "star": return <svg viewBox="0 0 20 20" {...s}><path {...p} d="M10 3l2.2 4.6 5 .6-3.7 3.4 1 5L10 14.2 5.5 16.6l1-5L2.8 8.2l5-.6L10 3z"/></svg>;
+    case "alert": return <svg viewBox="0 0 20 20" {...s}><path {...p} d="M10 2L1.5 17h17L10 2zM10 8v4M10 14.5v.5"/></svg>;
+    case "shield": return <svg viewBox="0 0 20 20" {...s}><path {...p} d="M10 2l7 3v5c0 4-3 7-7 8-4-1-7-4-7-8V5l7-3zM7 10l2 2 4-4"/></svg>;
+    case "phone": return <svg viewBox="0 0 20 20" {...s}><path {...p} d="M5.5 2.5l2 1 1 3-2 1.5c.5 2 2 3.5 4 4L12 10l3 1 1 2-1.5 2a2 2 0 01-2 1C7 15.5 4.5 13 4 7a2 2 0 011-2l.5-2.5z"/></svg>;
+    case "book": return <svg viewBox="0 0 20 20" {...s}><path {...p} d="M2 4h6a2 2 0 012 2v11a2 2 0 00-2-2H2V4zM18 4h-6a2 2 0 00-2 2v11a2 2 0 012-2h6V4z"/></svg>;
+    case "clipboard": return <svg viewBox="0 0 20 20" {...s}><rect x="4" y="3" width="12" height="15" rx="2" {...p}/><path {...p} d="M7 3v-1a1 1 0 011-1h4a1 1 0 011 1v1M7 9h6M7 12h6M7 15h4"/></svg>;
+    case "building": return <svg viewBox="0 0 20 20" {...s}><path {...p} d="M3 18V6l7-3 7 3v12M3 18h14M7 9h2M11 9h2M7 13h2M11 13h2"/></svg>;
+    case "lock": return <svg viewBox="0 0 20 20" {...s}><rect x="4" y="9" width="12" height="9" rx="2" {...p}/><path {...p} d="M7 9V6a3 3 0 016 0v3"/></svg>;
+    default: return null;
+  }
+}
+
+// --- Styles (one object, unique name) ---
+const mocaStyles = {
+  screen: {
+    minHeight: "100%",
+    background: "#07090B",
+    overflowY: "auto", overflowX: "hidden",
+    fontFamily: "'Geist', -apple-system, system-ui, sans-serif",
+    color: "#ECEFF2",
+    position: "relative",
+  },
+  topBar: {
+    display: "flex", justifyContent: "space-between", alignItems: "center",
+    padding: "58px 20px 0", position: "relative", zIndex: 3,
+  },
+  wordmark: {
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: 12, letterSpacing: "0.22em", textTransform: "uppercase",
+    color: "#AEB6BD",
+  },
+  menuBtn: {
+    width: 32, height: 32, borderRadius: 16,
+    border: "1px solid rgba(255,255,255,0.12)",
+    background: "rgba(255,255,255,0.03)",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    cursor: "pointer",
+  },
+
+  header: {
+    padding: "24px 22px 18px", textAlign: "center",
+  },
+  eyebrow: {
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase",
+    color: "var(--accent)",
+    display: "inline-flex", alignItems: "center", gap: 8,
+    marginBottom: 12,
+  },
+  eyebrowDot: {
+    width: 6, height: 6, borderRadius: 3, background: "var(--accent)",
+    boxShadow: "0 0 10px var(--accent)",
+  },
+  h1: {
+    fontFamily: "var(--display-font, Instrument Serif), serif",
+    fontSize: 34, lineHeight: 1.05, fontWeight: 400, letterSpacing: "-0.02em",
+    margin: 0, textWrap: "pretty",
+    paddingBottom: 4,
+  },
+  hr: {
+    width: 48, height: 1,
+    background: "linear-gradient(90deg, transparent, var(--accent), transparent)",
+    margin: "14px auto 0", border: 0,
+  },
+  testPills: {
+    display: "flex", gap: 8, justifyContent: "center", marginTop: 14,
+  },
+  testPill: (active) => ({
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: 10, letterSpacing: "0.14em",
+    padding: "4px 10px", borderRadius: 20,
+    background: active ? "rgba(120,200,220,0.15)" : "rgba(255,255,255,0.04)",
+    color: active ? "var(--accent)" : "#6B757E",
+    border: `1px solid ${active ? "rgba(120,200,220,0.3)" : "rgba(255,255,255,0.07)"}`,
+    textTransform: "uppercase",
+  }),
+
+  disclaimer: {
+    margin: "0 22px 20px",
+    padding: "12px 14px",
+    borderRadius: 10,
+    background: "rgba(180, 120, 60, 0.08)",
+    border: "1px solid rgba(220, 160, 100, 0.22)",
+    fontSize: 12, lineHeight: 1.6,
+    color: "#E6C89A",
+    display: "flex", gap: 10, alignItems: "flex-start",
+  },
+  disclaimerText: { flex: 1 },
+  strongAmber: { color: "#F5D79E" },
+
+  card: {
+    margin: "0 22px 14px",
+    padding: "18px 20px",
+    borderRadius: 16,
+    background: "linear-gradient(180deg, rgba(20,26,32,0.7), rgba(14,18,22,0.3))",
+    border: "1px solid rgba(255,255,255,0.08)",
+  },
+  pCard: {
+    fontSize: 13.5, lineHeight: 1.6, color: "#C9D1D9",
+    margin: "0 0 12px",
+    textWrap: "pretty",
+  },
+  pCardLast: { marginBottom: 0 },
+  accentStrong: { color: "var(--accent)", fontWeight: 600 },
+  warmStrong: { color: "#E6C89A", fontWeight: 600 },
+
+  noteBlue: {
+    background: "rgba(120,200,220,0.08)",
+    border: "1px solid rgba(120,200,220,0.2)",
+    borderRadius: 10,
+    padding: "10px 14px",
+    fontSize: 12, lineHeight: 1.55,
+    color: "#B9D9E0",
+    display: "flex", gap: 10, alignItems: "flex-start",
+  },
+  noteAmber: {
+    background: "rgba(180, 120, 60, 0.08)",
+    border: "1px solid rgba(220, 160, 100, 0.2)",
+    borderRadius: 10,
+    padding: "10px 14px",
+    fontSize: 12, lineHeight: 1.55,
+    color: "#E6C89A",
+    display: "flex", gap: 10, alignItems: "flex-start",
+    margin: "0 22px 16px",
+  },
+
+  resourceBlock: {
+    margin: "0 22px 16px",
+    padding: "18px",
+    borderRadius: 16,
+    border: "1px solid rgba(255,255,255,0.08)",
+    background: "rgba(255,255,255,0.02)",
+  },
+  resourceHead: {
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase",
+    color: "var(--accent)", marginBottom: 14,
+    display: "flex", alignItems: "center", gap: 10,
+  },
+  resourceLink: {
+    display: "flex", alignItems: "center", gap: 12,
+    padding: "12px 14px",
+    marginBottom: 8,
+    borderRadius: 12,
+    background: "rgba(120,200,220,0.06)",
+    border: "1px solid rgba(120,200,220,0.18)",
+    textDecoration: "none",
+    color: "inherit",
+  },
+  resourceIcon: {
+    width: 36, height: 36, borderRadius: 10,
+    background: "rgba(120,200,220,0.1)",
+    border: "1px solid rgba(120,200,220,0.2)",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    color: "var(--accent)", flexShrink: 0,
+  },
+  resourceTitle: { fontSize: 13, fontWeight: 600, color: "#ECEFF2", letterSpacing: "-0.01em" },
+  resourceSub: { fontSize: 11, color: "#8A949D", marginTop: 2, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.04em" },
+
+  cta: (enabled, kind = "primary") => ({
+    width: "calc(100% - 44px)",
+    margin: "14px 22px 0",
+    padding: "16px 20px",
+    borderRadius: 999,
+    background: !enabled ? "rgba(255,255,255,0.04)"
+      : kind === "primary" ? "var(--accent)"
+      : kind === "teal" ? "rgba(47, 120, 118, 0.9)"
+      : "rgba(255,255,255,0.03)",
+    color: !enabled ? "#475059" : (kind === "primary" ? "#04141A" : "#ECEFF2"),
+    border: kind === "secondary" ? "1px solid rgba(255,255,255,0.12)" : "none",
+    fontSize: 15, fontWeight: 600,
+    fontFamily: "'Geist', sans-serif",
+    cursor: enabled ? "pointer" : "not-allowed",
+    letterSpacing: "-0.01em",
+    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+    boxSizing: "border-box",
+  }),
+
+  // register phase
+  wordStack: {
+    padding: "4px 22px 16px",
+    display: "flex", flexDirection: "column", gap: 10,
+  },
+  wordRow: {
+    padding: "18px 22px",
+    borderRadius: 14,
+    background: "linear-gradient(180deg, rgba(120,200,220,0.1), rgba(120,200,220,0.03))",
+    border: "1px solid rgba(120,200,220,0.22)",
+    display: "flex", alignItems: "center", justifyContent: "space-between",
+  },
+  wordText: {
+    fontFamily: "var(--display-font, Instrument Serif), serif",
+    fontSize: 28, letterSpacing: "0.04em",
+    color: "#ECEFF2",
+    paddingBottom: 2,
+  },
+  wordIdx: {
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: 10, color: "#6B757E",
+    letterSpacing: "0.14em",
+  },
+
+  // test phase
+  progressWrap: {
+    margin: "4px 22px 18px",
+  },
+  progressHead: {
+    display: "flex", alignItems: "center", gap: 10, marginBottom: 10,
+  },
+  progressIconBox: {
+    width: 28, height: 28, borderRadius: 8,
+    background: "rgba(120,200,220,0.08)",
+    border: "1px solid rgba(120,200,220,0.2)",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    color: "var(--accent)",
+  },
+  progressSection: {
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase",
+    color: "var(--accent)", flex: 1,
+  },
+  progressTrack: {
+    height: 3, background: "rgba(255,255,255,0.06)", borderRadius: 2, overflow: "hidden",
+  },
+  progressFill: (pct) => ({
+    height: "100%", width: `${pct * 100}%`,
+    background: "linear-gradient(90deg, var(--accent-dim), var(--accent))",
+    transition: "width 0.4s ease",
+    boxShadow: "0 0 8px var(--accent)",
+  }),
+  progressMeta: {
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: 10, color: "#6B757E", letterSpacing: "0.12em",
+    marginTop: 6,
+  },
+
+  qCard: {
+    margin: "0 22px 10px",
+    padding: "14px 16px",
+    borderRadius: 14,
+    background: "rgba(255,255,255,0.02)",
+    border: "1px solid rgba(255,255,255,0.08)",
+  },
+  qRow: { display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 10 },
+  qIdx: {
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: 11, color: "var(--accent)", paddingTop: 2,
+    letterSpacing: "0.08em",
+  },
+  qText: { fontSize: 14, lineHeight: 1.5, color: "#E5EAEF", textWrap: "pretty" },
+  input: {
+    width: "100%",
+    background: "rgba(255,255,255,0.04)",
+    border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: 8,
+    padding: "11px 14px",
+    color: "#F4F6F8",
+    fontSize: 15, outline: "none",
+    boxSizing: "border-box",
+    fontFamily: "'Geist', sans-serif",
+    letterSpacing: "-0.01em",
+  },
+
+  // results
+  scoreBlock: {
+    textAlign: "center",
+    padding: "18px 22px 8px",
+  },
+  scoreHuge: {
+    fontFamily: "var(--display-font, Instrument Serif), serif",
+    fontSize: 108, lineHeight: 0.95, letterSpacing: "-0.03em",
+    color: "#ECEFF2",
+    paddingBottom: 6,
+    fontVariantNumeric: "tabular-nums",
+  },
+  scoreMax: {
+    fontFamily: "var(--display-font, Instrument Serif), serif",
+    fontSize: 48, color: "#6B757E", fontStyle: "italic",
+    fontVariantNumeric: "tabular-nums",
+  },
+  scoreCaption: {
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase",
+    color: "#6B757E", marginTop: 6,
+  },
+
+  breakdownCard: {
+    margin: "0 22px 14px",
+    borderRadius: 14,
+    border: "1px solid rgba(255,255,255,0.08)",
+    background: "rgba(255,255,255,0.02)",
+    overflow: "hidden",
+  },
+  breakdownHead: {
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase",
+    color: "var(--accent)",
+    padding: "14px 16px 10px",
+  },
+  bdRow: {
+    display: "flex", justifyContent: "space-between", alignItems: "center",
+    padding: "12px 16px",
+    borderTop: "1px solid rgba(255,255,255,0.06)",
+  },
+  bdName: { fontSize: 13, color: "#D0D7DD", letterSpacing: "-0.01em" },
+  bdScore: (full) => ({
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: 13,
+    color: full ? "var(--accent)" : "#E6C89A",
+    fontVariantNumeric: "tabular-nums",
+  }),
+
+  footer: {
+    padding: "28px 22px 56px",
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase",
+    color: "#6B757E",
+    display: "flex", justifyContent: "space-between",
+    borderTop: "1px solid rgba(255,255,255,0.06)",
+    marginTop: 20,
+  },
+
+  heroViz: {
+    margin: "0 -22px 6px",
+    height: 220,
+    position: "relative",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    overflow: "hidden",
+  },
+  vizLabel: {
+    position: "absolute",
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase",
+    color: "rgba(255,255,255,0.45)",
+  },
+};
+
+function ResourceLinks() {
+  const links = [
+    { href: "https://www.alz.org", icon: "building", title: "Alzheimer's Association", sub: "alz.org · Helpline 800-272-3900" },
+    { href: "https://mocatest.org", icon: "clipboard", title: "Official MoCA Test", sub: "mocatest.org · Clinically validated" },
+    { href: "https://www.nia.nih.gov/health/alzheimers-and-dementia", icon: "book", title: "NIH · National Institute on Aging", sub: "nia.nih.gov · Research & diagnosis" },
+  ];
+  return (
+    <div style={mocaStyles.resourceBlock}>
+      <div style={mocaStyles.resourceHead}>
+        <span style={mocaStyles.eyebrowDot} />
+        <span>Official Resources</span>
+      </div>
+      {links.map(l => (
+        <a key={l.href} href={l.href} target="_blank" rel="noopener noreferrer" style={mocaStyles.resourceLink}>
+          <div style={mocaStyles.resourceIcon}>
+            <MocaIcon kind={l.icon} color="var(--accent)" size={18} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={mocaStyles.resourceTitle}>{l.title}</div>
+            <div style={mocaStyles.resourceSub}>{l.sub}</div>
+          </div>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M3 6h6M6 3l3 3-3 3" stroke="var(--accent)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </a>
+      ))}
+      <div style={{ ...mocaStyles.noteBlue, marginTop: 8 }}>
+        <MocaIcon kind="lock" color="#B9D9E0" size={16} />
+        <div><strong style={{ color: "#ECEFF2" }}>Privacy:</strong> free tool, no accounts, no tracking, no data stored.</div>
+      </div>
+    </div>
+  );
+}
+
+function Disclaimer() {
+  return (
+    <div style={mocaStyles.disclaimer}>
+      <MocaIcon kind="alert" color="#E6C89A" size={18} />
+      <div style={mocaStyles.disclaimerText}>
+        <strong style={mocaStyles.strongAmber}>Medical Disclaimer:</strong> educational exercise only — <strong style={mocaStyles.strongAmber}>cannot diagnose</strong> Alzheimer's disease or any condition. Only a licensed clinician can interpret cognitive assessments. If concerned, contact your doctor or call <strong style={mocaStyles.strongAmber}>800-272-3900</strong>.
+      </div>
+    </div>
+  );
+}
+
+function Header({ testIdx }) {
+  return (
+    <div style={mocaStyles.header}>
+      <div style={mocaStyles.eyebrow}>
+        <span style={mocaStyles.eyebrowDot} />
+        <span>Cognitive Screening Exercise</span>
+      </div>
+      <h1 style={mocaStyles.h1}>MoCA-Style Assessment</h1>
+      <div style={mocaStyles.hr} />
+      <div style={mocaStyles.testPills}>
+        {TEST_SETS.map((t, i) => (
+          <span key={t.label} style={mocaStyles.testPill(i === testIdx)}>{t.label}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function IntroPhase({ testSet, vizStyle, accent, accentDim, onBegin }) {
+  return (
+    <React.Fragment>
+      <div style={mocaStyles.heroViz}>
+        <BrainViz style={vizStyle} accent={accent} accentDim={accentDim} size={240} />
+        <div style={{ ...mocaStyles.vizLabel, top: 10, left: 22 }}>Session · 04-19-26</div>
+        <div style={{ ...mocaStyles.vizLabel, top: 10, right: 22, color: "var(--accent)" }}>● Ready</div>
+      </div>
+      <div style={mocaStyles.card}>
+        <p style={mocaStyles.pCard}>
+          This exercise uses questions adapted from the{" "}
+          <span style={mocaStyles.warmStrong}>Montreal Cognitive Assessment (MoCA)</span> — one of the most widely validated cognitive screening tools used by clinicians worldwide.
+        </p>
+        <p style={mocaStyles.pCard}>
+          Sections: <span style={mocaStyles.accentStrong}>Orientation</span>, <span style={mocaStyles.accentStrong}>Attention</span>, <span style={mocaStyles.accentStrong}>Language</span>, <span style={mocaStyles.accentStrong}>Abstraction</span>, and <span style={mocaStyles.accentStrong}>Delayed Word Recall</span>.
+        </p>
+        <div style={mocaStyles.noteBlue}>
+          <MocaIcon kind="clipboard" color="#B9D9E0" size={16} />
+          <div>You will first see <strong style={{ color: "#ECEFF2" }}>5 words to memorize</strong>. You'll be asked to recall them later — no hints.</div>
+        </div>
+      </div>
+      <ResourceLinks />
+      <button style={mocaStyles.cta(true, "primary")} onClick={onBegin}>
+        <span>Begin {testSet.label}</span>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M3 8h10M9 4l4 4-4 4" stroke="#04141A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+    </React.Fragment>
+  );
+}
+
+function RegisterPhase({ testSet, onContinue }) {
+  const [countdown, setCountdown] = React.useState(6);
+  const [ready, setReady] = React.useState(false);
+
+  React.useEffect(() => {
+    setCountdown(6); setReady(false);
+    const iv = setInterval(() => {
+      setCountdown(c => {
+        if (c <= 1) { clearInterval(iv); setReady(true); return 0; }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(iv);
+  }, []);
+
+  return (
+    <React.Fragment>
+      <div style={{ textAlign: "center", padding: "4px 22px 18px" }}>
+        <div style={mocaStyles.eyebrow}>
+          <span style={mocaStyles.eyebrowDot} />
+          <span>Memorize These 5 Words</span>
+        </div>
+      </div>
+      <div style={mocaStyles.wordStack}>
+        {testSet.words.map((w, i) => (
+          <div key={w} style={{ ...mocaStyles.wordRow, animation: `fadeUp 0.4s ease ${i * 0.12}s both` }}>
+            <div style={mocaStyles.wordText}>{w}</div>
+            <div style={mocaStyles.wordIdx}>0{i + 1} / 05</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ ...mocaStyles.progressMeta, textAlign: "center" }}>
+        Study carefully. No hints will be given later.
+      </div>
+      <button style={mocaStyles.cta(ready, "primary")} disabled={!ready} onClick={onContinue}>
+        {ready ? (
+          <React.Fragment>
+            <span>I've memorized them — Continue</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M3 8h10M9 4l4 4-4 4" stroke="#04141A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </React.Fragment>
+        ) : (
+          <span>Please wait {countdown}s…</span>
+        )}
+      </button>
+    </React.Fragment>
+  );
+}
+
+function TestPhase({ questions, sectionIdx, answers, setAnswers, onNext }) {
+  const cur = questions[sectionIdx];
+  const allAnswered = cur.items.every(it => (answers[it.key] || "").toString().trim() !== "");
+  const isLast = sectionIdx >= questions.length - 1;
+  const progress = (sectionIdx + 1) / questions.length;
+
+  return (
+    <React.Fragment>
+      <div style={mocaStyles.progressWrap}>
+        <div style={mocaStyles.progressHead}>
+          <div style={mocaStyles.progressIconBox}>
+            <MocaIcon kind={cur.icon} color="var(--accent)" size={16} />
+          </div>
+          <div style={mocaStyles.progressSection}>{cur.section}</div>
+        </div>
+        <div style={mocaStyles.progressTrack}>
+          <div style={mocaStyles.progressFill(progress)} />
+        </div>
+        <div style={mocaStyles.progressMeta}>
+          Section {sectionIdx + 1} of {questions.length}
+        </div>
+      </div>
+
+      {cur.recall && (
+        <div style={mocaStyles.noteAmber}>
+          <MocaIcon kind="star" color="#E6C89A" size={16} />
+          <div>Recall the 5 words from the beginning — <strong style={mocaStyles.strongAmber}>no hints!</strong></div>
+        </div>
+      )}
+
+      {cur.items.map((item, i) => (
+        <div key={item.key} style={mocaStyles.qCard}>
+          <div style={mocaStyles.qRow}>
+            <div style={mocaStyles.qIdx}>{String(i + 1).padStart(2, "0")}</div>
+            <div style={mocaStyles.qText}>{item.q}</div>
+          </div>
+          <input
+            type={item.type === "number" ? "number" : "text"}
+            inputMode={item.type === "number" ? "numeric" : "text"}
+            value={answers[item.key] || ""}
+            onChange={e => setAnswers(a => ({ ...a, [item.key]: e.target.value }))}
+            placeholder="Your answer…"
+            style={mocaStyles.input}
+          />
+        </div>
+      ))}
+
+      <button style={mocaStyles.cta(allAnswered, "primary")} disabled={!allAnswered} onClick={onNext}>
+        <span>{isLast ? "Submit & See Results" : "Next Section"}</span>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M3 8h10M9 4l4 4-4 4" stroke={allAnswered ? "#04141A" : "#475059"} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+    </React.Fragment>
+  );
+}
+
+function ResultsPhase({ testSet, score, vizStyle, accent, accentDim, onRetakeSame, onNextTest }) {
+  const nextLabel = TEST_SETS[(TEST_SETS.findIndex(t => t.label === testSet.label) + 1) % TEST_SETS.length].label;
+  return (
+    <React.Fragment>
+      <div style={mocaStyles.heroViz}>
+        <BrainViz style={vizStyle} accent={accent} accentDim={accentDim} size={220} />
+        <div style={{ ...mocaStyles.vizLabel, top: 10, left: 22 }}>Result · {testSet.label}</div>
+        <div style={{ ...mocaStyles.vizLabel, top: 10, right: 22, color: "var(--accent)" }}>● Complete</div>
+      </div>
+
+      <div style={mocaStyles.scoreBlock}>
+        <div style={mocaStyles.eyebrow}>
+          <span style={mocaStyles.eyebrowDot} />
+          <span>Your Results — {testSet.label}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 4, marginTop: 8 }}>
+          <div style={mocaStyles.scoreHuge}>{score.recallScore}</div>
+          <div style={mocaStyles.scoreMax}>/{score.recallMax}</div>
+        </div>
+        <div style={mocaStyles.scoreCaption}>Words recalled</div>
+      </div>
+
+      <div style={mocaStyles.breakdownCard}>
+        <div style={mocaStyles.breakdownHead}>Section Breakdown</div>
+        {score.breakdown.map(b => (
+          <div key={b.section} style={mocaStyles.bdRow}>
+            <div style={mocaStyles.bdName}>{b.section}</div>
+            <div style={mocaStyles.bdScore(b.score === b.max && b.max > 0)}>
+              {b.score}<span style={{ color: "#6B757E" }}>/{b.max || "—"}</span>
+            </div>
+          </div>
+        ))}
+        <div style={mocaStyles.bdRow}>
+          <div style={mocaStyles.bdName}>Word Recall</div>
+          <div style={mocaStyles.bdScore(score.recallScore >= 4)}>
+            {score.recallScore}<span style={{ color: "#6B757E" }}>/{score.recallMax}</span>
+          </div>
+        </div>
+      </div>
+
+      <div style={mocaStyles.disclaimer}>
+        <MocaIcon kind="alert" color="#E6C89A" size={18} />
+        <div style={mocaStyles.disclaimerText}>
+          <strong style={mocaStyles.strongAmber}>Important:</strong> these results are for self-reflection only and have no clinical meaning. Scores vary day to day based on sleep, stress, and medications. For genuine concerns, speak with your physician or call{" "}
+          <strong style={mocaStyles.strongAmber}>Alzheimer's Association: 800-272-3900</strong> (free, 24/7).
+        </div>
+      </div>
+
+      <ResourceLinks />
+
+      <button style={mocaStyles.cta(true, "teal")} onClick={onNextTest}>
+        <span>Try {nextLabel} — Different Words</span>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M2 7a5 5 0 019-3M12 7a5 5 0 01-9 3M9 3h3v3M5 11H2V8" stroke="#ECEFF2" strokeWidth="1.3" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+      <button style={mocaStyles.cta(true, "secondary")} onClick={onRetakeSame}>
+        <span>Retake {testSet.label}</span>
+      </button>
+    </React.Fragment>
+  );
+}
+
+function MocaApp({ vizStyle, accent, accentDim, displayFont }) {
+  const [phase, setPhase] = React.useState(() => localStorage.getItem("moca-phase") || "intro");
+  const [testIdx, setTestIdx] = React.useState(() => {
+    const v = Number(localStorage.getItem("moca-testIdx") || 0);
+    return isNaN(v) ? 0 : v % TEST_SETS.length;
+  });
+  const [sectionIdx, setSectionIdx] = React.useState(0);
+  const [answers, setAnswers] = React.useState({});
+  const [score, setScore] = React.useState(null);
+
+  React.useEffect(() => { localStorage.setItem("moca-phase", phase); }, [phase]);
+  React.useEffect(() => { localStorage.setItem("moca-testIdx", String(testIdx)); }, [testIdx]);
+
+  const testSet = TEST_SETS[testIdx];
+  const questions = React.useMemo(() => buildQuestions(testSet), [testSet]);
+
+  const nextSection = () => {
+    if (sectionIdx < questions.length - 1) setSectionIdx(s => s + 1);
+    else {
+      const breakdown = questions.map(section => {
+        let s = 0, max = 0;
+        section.items.forEach(item => {
+          if (!item.correct) return;
+          max++;
+          if ((answers[item.key] || "").toString().toLowerCase().trim() === item.correct) s++;
+        });
+        return { section: section.section, score: s, max };
+      });
+      const recallScore = testSet.words.filter((w, i) =>
+        (answers[`r${i}`] || "").toLowerCase().trim() === w.toLowerCase()
+      ).length;
+      setScore({ recallScore, recallMax: testSet.words.length, breakdown });
+      setPhase("results");
+    }
+  };
+
+  const restart = (nextTest) => {
+    if (nextTest) setTestIdx(i => (i + 1) % TEST_SETS.length);
+    setPhase("intro"); setSectionIdx(0); setAnswers({}); setScore(null);
+  };
+
+  const rootStyle = { ...mocaStyles.screen, ["--display-font"]: displayFont };
+
+  return (
+    <div style={rootStyle}>
+      <div style={mocaStyles.topBar}>
+        <div style={mocaStyles.wordmark}>◐ Moca-Screen</div>
+        <div style={mocaStyles.menuBtn} onClick={() => restart(false)} title="Restart">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M2 7a5 5 0 019-3M12 7a5 5 0 01-9 3M9 3h3v3M5 11H2V8" stroke="#AEB6BD" strokeWidth="1.3" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
+      </div>
+
+      <Header testIdx={testIdx} />
+      <Disclaimer />
+
+      {phase === "intro" && (
+        <IntroPhase testSet={testSet} vizStyle={vizStyle} accent={accent} accentDim={accentDim}
+          onBegin={() => setPhase("register")} />
+      )}
+      {phase === "register" && (
+        <RegisterPhase testSet={testSet} onContinue={() => { setPhase("test"); setSectionIdx(0); }} />
+      )}
+      {phase === "test" && (
+        <TestPhase questions={questions} sectionIdx={sectionIdx} answers={answers}
+          setAnswers={setAnswers} onNext={nextSection} />
+      )}
+      {phase === "results" && score && (
+        <ResultsPhase testSet={testSet} score={score} vizStyle={vizStyle} accent={accent} accentDim={accentDim}
+          onRetakeSame={() => restart(false)} onNextTest={() => restart(true)} />
+      )}
+
+      <div style={mocaStyles.footer}>
+        <span>Moca-Screen · v1.0</span>
+        <span>Not a diagnosis</span>
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { MocaApp });
+
+</script>
+<script type="text/babel" data-presets="react">
+// boot.jsx — mount MocaApp into the iOS frame, handle tweaks
+const BOOT_ACCENTS = {
+  200: { accent: 'oklch(0.78 0.09 200)', dim: 'oklch(0.45 0.07 210)' },
+  160: { accent: 'oklch(0.78 0.09 160)', dim: 'oklch(0.45 0.07 170)' },
+  280: { accent: 'oklch(0.78 0.09 280)', dim: 'oklch(0.45 0.07 280)' },
+  70:  { accent: 'oklch(0.82 0.09 70)',  dim: 'oklch(0.50 0.08 70)' },
+  20:  { accent: 'oklch(0.75 0.09 20)',  dim: 'oklch(0.50 0.08 20)' },
+};
+
+function Boot() {
+  const d = window.TWEAK_DEFAULTS || {};
+  const [hue, setHue] = React.useState(d.accentHue || 200);
+  const [vizStyle, setVizStyle] = React.useState(d.vizStyle || 'neural');
+  const [displayFont, setDisplayFont] = React.useState(d.displayFont || 'Instrument Serif');
+
+  const acc = BOOT_ACCENTS[hue] || BOOT_ACCENTS[200];
+  React.useEffect(() => {
+    document.documentElement.style.setProperty('--accent', acc.accent);
+    document.documentElement.style.setProperty('--accent-dim', acc.dim);
+  }, [acc]);
+
+  React.useEffect(() => {
+    const onMsg = (e) => {
+      const d = e.data || {};
+      if (d.type === '__activate_edit_mode') document.getElementById('tweaks').classList.add('open');
+      if (d.type === '__deactivate_edit_mode') document.getElementById('tweaks').classList.remove('open');
+    };
+    window.addEventListener('message', onMsg);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', onMsg);
+  }, []);
+
+  React.useEffect(() => {
+    document.querySelectorAll('#swatches button').forEach(btn => {
+      btn.classList.toggle('active', Number(btn.dataset.hue) === hue);
+      btn.onclick = () => {
+        const h = Number(btn.dataset.hue);
+        setHue(h);
+        window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { accentHue: h } }, '*');
+      };
+    });
+    const viz = document.getElementById('vizStyle');
+    if (viz) {
+      viz.value = vizStyle;
+      viz.onchange = e => {
+        setVizStyle(e.target.value);
+        window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { vizStyle: e.target.value } }, '*');
+      };
+    }
+    const f = document.getElementById('fontSel');
+    if (f) {
+      f.value = displayFont;
+      f.onchange = e => {
+        setDisplayFont(e.target.value);
+        window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { displayFont: e.target.value } }, '*');
+      };
+    }
+  }, [hue, vizStyle, displayFont]);
+
+  return (
+    <div className="frame-col" data-screen-label="01 App">
+      <div className="frame-label">Moca-Screen · Mobile</div>
+      <IOSDevice width={390} height={844} dark={true}>
+        <MocaApp vizStyle={vizStyle} accent={acc.accent} accentDim={acc.dim} displayFont={displayFont} />
+      </IOSDevice>
+      <div className="frame-label" style={{ opacity: 0.6 }}>
+        Intro → Register → Test (4 sections) → Results
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Boot />);
+
+</script>
+
+</body>
+</html>
