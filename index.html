@@ -1512,6 +1512,15 @@ function MocaApp({ vizStyle, accent, accentDim, displayFont }) {
           onRetakeSame={() => restart(false)} onNextTest={() => restart(true)} />
       )}
 
+      <div style={{ padding: "24px 22px 48px", borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: 20, textAlign: "center", fontFamily: "'JetBrains Mono', monospace", fontSize: 10, letterSpacing: "0.12em", color: "#4a5560", lineHeight: 1.8 }}>
+        Designed using <a href="https://claude.ai/code" target="_blank" rel="noopener noreferrer" style={{ color: "#6B757E", textDecoration: "none" }}>Anthropic Claude Code</a>
+        {" · "}Served by <a href="https://vercel.com" target="_blank" rel="noopener noreferrer" style={{ color: "#6B757E", textDecoration: "none" }}>Vercel</a>
+        {" & "}
+        <a href="https://cloudflare.com" target="_blank" rel="noopener noreferrer" style={{ color: "#6B757E", textDecoration: "none" }}>Cloudflare</a>
+        <br />
+        <a href="https://www.timmcallister.io/" target="_blank" rel="noopener noreferrer" style={{ color: "#5a6570", textDecoration: "none" }}>timmcallister.io</a>
+      </div>
+
     </div>
   );
 }
